@@ -1,0 +1,800 @@
+#+TITLE:Search Engines for Nyxt
+
+The aim of nx-search-engines is to get rid of black box world of
+search bookmarklets and search cookies by moving to the pretty land of
+lispy syntax and small helper functions generating search URIs.
+
+As an example, instead of fiddling with [[https://www.squarefree.com/bookmarklets/search.html][websites for search
+bookmarklets]], you can define the DuckDuckGo search engine with
+Terminal theme, instant answers turned off, and autocomplete
+suggestions turned off with just a simple call to:
+
+#+begin_src lisp
+  (engines:duckduckgo :theme :terminal
+                      :shortcut "duck"
+                      :instant-answers nil
+                      :autocomplete nil)
+#+end_src
+
+This will return your new fancy DuckDuckGo engine that you can append
+to the =search-engines= in buffer configuration.
+
+#+begin_src lisp
+  (define-configuration buffer
+    ((search-engines (append %slot-default%
+                             (list (engines:duckduckgo
+                                    :theme :terminal
+                                    :shortcut "duck" ;; Shortcut for set-url prompt.
+                                    :instant-answers nil
+                                    :autocomplete nil))))))
+#+end_src
+
+After that, typing "duck hello there" will search for "hello there" in your shiny DuckDuckGo :)
+
+* Geting Started
+First, you need to clone this repository to where Nyxt can find it:
+#+begin_src sh
+  # The ~/.local/share/nyxt/extensions/ is the default path Nyxt looks
+  # for extensions in. Change to wherever you set your extension path.
+  git clone https://github.com/aartaka/nx-search-engines ~/.local/share/nyxt/extensions/nx-search-engines
+#+end_src
+
+The smallest possible configuration involving nx-search-engines is:
+#+begin_src lisp
+  ;; Load search-engines.lisp after loading nx-search-engines.
+  ,#+nyxt-2
+  (load-after-system :nx-search-engines (nyxt-init-file "search-engines.lisp"))
+  ,#+nyxt-3
+  (define-nyxt-user-system-and-load "nyxt-user/search-engines"
+    :depends-on (:nx-search-engines) :components ("search-engines.lisp"))
+#+end_src
+in your init file, and
+#+begin_src lisp
+  (in-package #:nyxt-user)
+
+  ;; Define buffer search-engines slot to be a list of several
+  ;; nx-search-engines-provided ones.
+  (define-configuration (buffer web-buffer)
+    ((search-engines (list (engines:google :shortcut "gmaps"
+                                           :object :maps)
+                           (engines:wordnet :shortcut "wn"
+                                            :show-word-frequencies t)
+                           (engines:google :shortcut "g"
+                                           :safe-search nil)
+                           (engines:duckduckgo :theme :terminal
+                                               :help-improve-duckduckgo nil
+                                               :homepage-privacy-tips nil
+                                               :privacy-newsletter nil
+                                               :newsletter-reminders nil
+                                               :install-reminders nil
+                                               :install-duckduckgo nil)))))
+#+end_src
+
+in search-engines.lisp (you need to create this file in the same
+directory where your init.lisp is). This will give you four search
+engines: WordNet, Google (maps and basic search) and DuckDuckGo. The
+last engine in the list is the default one. When you start Nyxt next
+time and invoke ~set-url~ (C-l), your search like "g ostrich" will get
+you to the Google search for ostrich, while a "kangaroo" search will
+end up in a cozy terminal-themed DuckDuckGo :)
+
+* Engines
+Helpers have lots of key arguments, but you don't need to use all of
+these. Helpers rely on search engine default behavior, so you can omit
+settings equal to defaults.
+
+A syntax resembling CLHS/man pages is used in search engines description. Basically:
+- square brackets mean an optional element,
+- curly brackets mean a mandatory element with several bar-separated options,
+- vertical bars mean that any of the bar-separated elements is fine,
+- asterisks mean any number of the element it is set after,
+- if there is a type name instead of actual value, then any value of that type is acceptable,
+- additional pseudo-types are explained after the syntax definition,
+- semicolons start comments.
+** DuckDuckGo
+Syntax for the DuckDuckGo-generating function is:
+#+begin_src
+  (duckduckgo [:shortcut string]
+              [:fallback-url quri:uri]
+              [:base-search-url string]
+              ;; DuckDuckGo uses two (four?) object-related keywords.
+              ;; To ensure the right search object, use both :object and :object2.
+              [:object {:all | :images | :videos | :news}]
+              [:object2 {:all | :images | :videos | :news}]
+              [:theme {:default | :basic | :contrast | :dark | :gray | :terminal}]
+              [:get-requests boolean]
+              [:video-playback {:prompt-me | :always-ddg | :always-third-party}]
+              [:redirect boolean]
+              ;; Some of these are abbreviations added for convenience.
+              ;; You can suggest yours if it's widespread in your country!
+              [:region {:argentina | :australia | :austria | :belgium-fr | :belgium-nl |
+                        :brazil | :bulgaria | :canada-en | :canada-fr | :catalonia | :chile |
+                        :china | :colombia | :croatia | :czech-republic | :denmark | :estonia |
+                        :finland | :france | :germany | :greece | :hong-kong | :hungary |
+                        :india-en | :india | :indonesia-en | :indonesia | :ireland |
+                        :israel-en | :israel | :italy | :japan | :korea | :latvia |
+                        :lithuania | :malaysia-en | :malaysia | :mexico | :netherlands |
+                        :new-zealand | :norway | :pakistan-en | :peru | :philippines-en |
+                        :philippines | :poland | :portugal | :romania | :russia |
+                        :russian-federation | :saudi-arabia | :singapore | :slovakia |
+                        :slovenia | :south-africa | :spain-ca | :spain-es | :spain |
+                        :sweden | :switzerland-de | :switzerland-fr | :taiwan | :thailand-en |
+                        :thailand | :turkey | :us-english | :us-en | :us | :us-spanish |
+                        :us-es | :ukraine | :united-kingdom | :uk | :vietnam-en | :vietnam}]
+              ;; Not yet written properly, too much Unicode
+              [:language string]
+              [:safe-search {:moderate | :strict | :off}]
+              [:instant-answers boolean]
+              [:infinite-scroll-for-media boolean]
+              [:infinite-scroll boolean]
+              [:autocomplete-suggestions boolean]
+              [:open-in-new-tab boolean]
+              [:advertisements boolean]
+              [:keyboard-shortcuts boolean]
+              [:units-of-measure {:no-preference | :metric | :us-based}]
+              [:map-rendering {:not-set | :best-available | :image-tiles}]
+              [:page-break-numbers {:on | :off | :lines}]
+              [:install-duckduckgo boolean]
+              [:install-reminders boolean]
+              [:privacy-newsletter boolean]
+              [:newsletter-reminders boolean]
+              [:homepage-privacy-tips boolean]
+              [:help-improve-duckduckgo boolean]
+              [:font font-name]
+              [:font-size {:large | :small | :medium | :larger | :largest}]
+              [:page-width {:normal | :wide | :super-wide}]
+              [:center-alignment boolean]
+              [:background-color color-code-string]
+              [:header-behavior {:on-dynamic | :on-fixed | :off | :on-scrolling}]
+              [:header-color color-code-string]
+              [:result-title-font font-name]
+              [:result-title-color color-code-string]
+              [:result-visited-title-color color-code-string]
+              [:result-title-underline boolean]
+              [:result-description-color color-code-string]
+              [:result-url-color color-code-string]
+              [:result-module-color color-code-string]
+              [:result-full-urls boolean]
+              [:result-urls-above-snipper boolean]
+              [:result-visible-checkmark boolean]
+              [:site-icons boolean])
+
+color-code-string := string of six hex numbers, e.g., "FF00A4"
+;; Actually, you can use the font name, like "Proxima Nova".
+font-name := {:proxima-nova | :arial | :century-gothic | :georgia | :helvetica | :helvetica-neue |
+              :sans-serif | :segoe-ui | :serif | :times | :tahoma | :trebuchet-ms | :verdana}
+#+end_src
+Quite a long definition, eh?
+
+Things left to do for DuckDuckGo:
+- Bind language settings.
+- Allow booleans where they fit (=:header-behavior=, =:safe-search=).
+
+*** DuckDuckGo Images (=duckduckgo-images=)
+A derived Image-search engine has the same syntax as the main one,
+except that it defaults to images.
+*** HTML-only DuckDuckGo (=duckduckgo-html-only=)
+This one can come in handy if you're into =noscript-mode=. Everything's
+the same as usual DDG, but it requires no JS to run and has much less
+configuration (barely any). Search completion is inherited from usual
+DDG, so you can have both dynamically loaded suggestions and HTML-only
+search :D
+*** DuckDuckGo completion helper
+=make-duckduckgo-completion= returns a search-ready completion function
+(it's already included if you use =duckduckgo=). Syntax is:
+#+begin_src
+(make-duckduckgo-completion [:request-args list])
+#+end_src
+
+** Brave
+Brave does not use query parameters for search settings, so it cannot be easily configured via nx-search-egnines. However, you can use this basic helper and then configure everything in Brave Search interface. The syntax of the helper is:
+#+begin_src
+(brave [:shortcut string]
+       [:fallback-url quri:uri]
+       [:base-search-url string]
+       [:timeframe {:any | :day | :week | :month | :year}])
+#+end_src
+
+*** Brave completion helper
+    =make-brave-completion= returns a search-ready completion function
+    (it's already included if you use =brave=). Syntax is:
+#+begin_src
+    (make-brave-completion [:request-args list])
+#+end_src
+** FrogFind
+FrogFind is much the same as HTML-only DuckDuckGo, but it goes even
+further in supporting retro tech: HTTP only, absolutely basic HTML, no
+configuration at all.
+#+begin_src
+(frogfind [:shortcut string]
+          [:fallback-url quri:uri]
+          [:base-search-url string])
+#+end_src
+
+** SearchMySite
+SearchMySite is a cool engine that indexes personal blogs. While this
+has a somewhat narrow scope, you could still find there's use to it.
+#+begin_src
+(searchmysite [:shortcut string]
+              [:fallback-url quri:uri]
+              [:base-search-url string])
+#+end_src
+
+** Google
+Syntax for Google helper is:
+#+begin_src
+(google [:shortcut string]
+        [:fallback-url quri:uri]
+        [:base-search-url string]
+        [:completion-function function]
+        [:safe-search boolean]
+        [:object {:all | :image | :video | :news | :shopping | :books | :finance}]
+        [:extra-filters {:sort-by-relevance | :sort-by-date | :archived |
+                         :show-duplicates | :verbatim}]
+        [:results-start integer]
+        [:results-number integer]
+        [:near-city string]
+        [:personalized-search boolean]
+        [:filetype string]
+        [:filetype-rule {:include | :exclude}]
+        [:site string]
+        [:site-rule {:include | :exclude}]
+        [:exclude-terms string]
+        [:access-rights {:all | :cc0 | :by | :by-sa | :by-nc | :by-nd}]
+        [:new-window boolean]
+        [:filter boolean]
+        [:lang-results language-keyword]
+        [:lang-ui language-keyword]
+        [:country-results country-keyword]
+        [:country-ui country-keyword]
+        [:coordinates string]
+        [:date-results {:default | :past-hour | :past-day | :past-week |
+                        :past-month | :past-year}])
+#+end_src
+
+Things left to do for Google:
+- Bind object-specific sorting settings.
+- Add keyword alias for =:safe-mode= (i.e., =:strict= as alias to =t=)
+*** Google Images (=google-images=)
+  Same as Google, but =:object= defaults to =:images=.
+*** Google completion helper
+    =make-google-completion= returns a search-ready completion function
+    (it's already included if you use =google=). Syntax is:
+#+begin_src
+    (make-google-completion [:request-args list])
+#+end_src
+*** Google Scholar
+Google Scholar is a science papers search engine. The syntax is:
+#+begin_src
+(google-scholar [:shortcut string]
+                [:fallback-url quri:uri]
+                [:base-search-url string]
+                [:starting-time year]
+                [:ending-time year]
+                [:sort-by {:relevance | :date}]
+                [:search-type {:any | :review}])
+#+end_src
+**** Google Scholar completion helper
+=make-google-scholar-completion= returns a search-ready completion function
+(it's already included if you use =google-scholar=). Syntax is:
+#+begin_src
+    (make-google-scholar-completion [:request-args list])
+#+end_src
+*** Whoogle
+[[https://github.com/benbusby/whoogle-search][whoogle-search]] search engine, a self-hosted, ad-free, privacy respecting meta search engine with results derived from Google.
+
+#+begin_src
+(whoogle [:shortcut string]
+         [:fallback-url quri:uri]
+         [:base-search-url string]
+         [:completion-function function]
+         [:object {:all | :image | :video | :news | :shopping |
+                   :books | :finance}]
+         [:extra-filters {:sort-by-relevance | :sort-by-date | :archived |
+                          :show-duplicates | :verbatim}]
+         [:results-start integer]
+         [:near-city string]
+         [:results-number integer]
+         [:personalized-search boolean]
+         [:exclude-autocorrect boolean]
+         [:lang-results boolean]
+         [:lang-ui boolean]
+         [:country boolean]
+         [:theme {:system | :dark | :light}]
+         [:alternatives boolean]
+         [:new-tab boolean]
+         [:view-image boolean]
+         [:blocked-sites string]
+         [:safe-search boolean]
+         [:no-javascript boolean]
+         [:anonymous-view boolean]
+         [:cookies-disabled boolean]
+         [:date-results {:default | :past-hour | :past-day | :past-week |
+                         :past-month | :past-year}]
+         [:chips string])
+#+end_src
+** Bing
+Bing is /special/ -- it hosts separate types of searches on separate
+paths, so we need to make several engines with different search-urls:
+*** Plain Bing
+Syntax is:
+#+begin_src
+(bing [:shortcut string]
+      [:fallback-url quri:uri]
+      [:base-search-url string]
+      [:my-language-only boolean]
+      [:my-country-only boolean]
+      [:date {:all | :past-24-hours | :past-week | :past-month | :past-year |
+              (bing-date local-time:timestamp local-time:timestamp)}])
+#+end_src
+Notice the use of =bind-date= helper -- it allows you to specify the
+date for the search. Lower bound is January 1st, 1970, upper bound
+is... uncertain.
+
+Things to do:
+- =:past-day= alias for =:past-24-hours= value of =:date=.
+*** Bing Images
+Syntax is:
+#+begin_src
+(bing-images [:shortcut string]
+             [:fallback-url quri:uri]
+             [:base-search-url string])
+#+end_src
+*** Bing Videos
+Syntax is:
+#+begin_src
+(bing-videos [:shortcut string]
+             [:fallback-url quri:uri]
+             [:base-search-url string])
+#+end_src
+*** Bing Maps
+Syntax is:
+#+begin_src
+(bing-maps [:shortcut string]
+           [:fallback-url quri:uri]
+           [:base-search-url string])
+#+end_src
+*** Bing News
+Syntax is:
+#+begin_src
+(bing-news [:shortcut string]
+           [:fallback-url quri:uri]
+           [:base-search-url string]
+           [:interval {:all | :past-5-minutes | :past-15-mimutes | :past-30-minutes |
+                       :past-hour | :past-4-hours | :past-6-hours | :past-24-hours |
+                       :past-day | :past-7-days | :past-week | :past-30-days | :past-month}])
+#+end_src
+*** Bing Shopping
+Syntax is:
+#+begin_src
+(bing-shopping [:shortcut string]
+               [:fallback-url quri:uri]
+               [:base-search-url string])
+#+end_src
+** WordNet
+While WordNet is not a general purpose search engine, it's a great
+dictionary and a linguistic tool (I mostly use it as a dictionary,
+though). Syntax is:
+#+begin_src
+(wordnet [:shortcut string]
+         [:fallback-url quri:uri]
+         [:base-search-url string]
+         [:show-examples boolean]
+         [:show-glosses boolean]
+         [:show-word-frequencies boolean]
+         [:show-db-locations boolean]
+         [:show-lexical-file-info boolean]
+         [:show-lexical-file-numbers boolean]
+         [:show-sense-keys boolean]
+         [:show-sense-numbers boolean])
+#+end_src
+
+Things to do:
+- Shorten the keyword names?
+** Wikipedia
+   Wikipedia is included in Nyxt by default, and there's not much you
+   can configure in it's search, but it should be in this repo :) Syntax:
+#+begin_src
+(wikipedia [:shortcut string]
+           [:fallback-url quri:uri]
+           [:base-search-url string]
+           [:completion-function function])
+#+end_src
+*** Wikipedia completion function helper
+    =make-wikipedia-completion= returns a search-ready completion
+    function (it's already included if you use =wikipedia=). Syntax is:
+#+begin_src
+(make-wikipedia-completion [:suggestion-limit integer]
+                           [:namespace namespace-keyword]
+                           [:request-args list])
+
+namespace-keyword := {:general | :talk | :user | :user-talk | :wikipedia | :wikipedia-talk |
+                      :file | :file-talk | :media-wiki | :media-wiki-talk | :template |
+                      :template-talk | :help | :help-talk | :category | :category-talk}
+#+end_src
+
+** Yahoo
+   Yahoo is still under development (I'm trying to figure out its
+   sorting mechanism). Usable, though. Syntax:
+#+begin_src
+(yahoo [:shortcut string]
+       [:fallback-url quri:uri]
+       [:base-search-url string]
+       [:completion-function function]
+       [:number-of-results number]
+       [:encoding {:utf}]
+       [:domain {:any | :dot-com | :dot-edu | :dot-gov | :dot-org}]
+       [:date {:past-day | :past-week | :past-month}])
+#+end_src
+*** Yahoo completion helper
+    =make-yahoo-completion= returns a search-ready completion
+    function (it's already included if you use =yahoo=). Syntax is:
+#+begin_src
+(make-yahoo-completion [:suggestion-limit integer]
+                       [:request-args list])
+#+end_src
+** Sci-Hub
+   Syntax:
+#+begin_src
+(scihub [:shortcut string]
+        [:fallback-url quri:uri]
+        [:base-search-url string])
+#+end_src
+** SearX
+   Syntax:
+#+begin_src lisp
+  (searx [:shortcut string]
+         [:fallback-url quri:uri]
+         [:base-search-url string] ; customize the instance there
+         [:completion-function function]
+         [:categories {:general | :images | :files | :map | :it |
+                       :news | :science | :social-media | :videos}]
+         [:language string] ; like en-US
+         [:time-range {:day | :week | :month | :year}]
+         [:interface-language string]
+         [:theme {:simple}]
+         [:style {:default | :auto | :light | :dark}]
+         [:safe-search {:strict | :moderate | :none}]
+         [:center-alignment boolean]
+         [:new-tab boolean]
+         [:infinite-scroll boolean]
+         [:request-method {:get | :post}]
+         [:image-proxy boolean]
+         [:query-title boolean])
+#+end_src
+** Startpage
+All the settings which are accessible from the search page can be configured.
+In order to specify settings from Startpage's "Settings" page, set `:settings-string` to the
+hexadecimal number situated after "prfe=" in the URL displayed in the "Save without cookie" section.
+Syntax:
+#+begin_src
+    (startpage [:shortcut string]
+               [:fallback-url quri:uri]
+               [:base-search-url string]
+               [:object {:web | :images | :videos | :news }
+               ;; If `language-ui` or `language-results` are set in Startpage's
+               ;; settings page, either via a cookie or the settings string, the
+               ;; settings below will be overridden.
+               [:language-ui {:dansk | :deutsch | :english | :espanol | :francais |
+                              :nederlands | :norsk | :polski | :portugues | :svenska}]
+               [:language-results  {:afrikaans | :albanian | :amharic | :arabic |
+                                    :azerbaijani | :basque | :belarusian | :bengali |
+                                    :bihari | :bosnian | :bulgarian | :catalan |
+                                    :croatian | :czech | :dansk | :deutsch | :english |
+                                    :english-uk | :espanol | :esperanto | :estonian |
+                                    :fantizhengwen | :faroese | :francais | :frisian |
+                                    :gaelic | :galician | :georgian | :greek |
+                                    :gujarati | :hangul | :hebrew | :hindi | :hungarian |
+                                    :icelandic | :indonesian | :interlingua |
+                                    :irish | :italiano | :javanese | :jiantizhongwen |
+                                    :kannada | :latin | :latvian | :lithuanian |
+                                    :macedonian | :malay | :malayalam | :maltese |
+                                    :marathi | :nederlands | :nepali | :nihongo |
+                                    :norsk | :occitan | :persian | :polski | :portugues |
+                                    :punjabi | :romanian | :russian | :serbian |
+                                    :sinhalese | :slovak | :slovenian | :sudanese |
+                                    :suomi | :svenska | :swahili | :tagalog |
+                                    :tamil | :telugu | :thai | :tigrinya |
+                                    :turkce | :ukrainian | :urdu | :uzbek |
+                                    :vietnamese | :welsh | :xhosa | :zulu}]
+               ;; web search arguments:
+               [:web-date {:any | :day | :week | :month | :year}]
+               [family-filter boolean]
+               [:web-region {:all :australia | :austria | :belarus |
+                             :belgium-fr | :belgium-nl | :brazil | :bulgaria | :canada |
+                             :canada-fr | :chile | :china | :denmark | :egypt | :finland |
+                             :france | :germany | :greece | :honk-kong | :india | :japan |
+                             :korean | :malaysia | :malaysia-en | :netherlands | :norway |
+                             :poland | :portugal | :romania | :russia | :south-africa |
+                             :spain | :spain-ca | :sweden | :switzerland-de |
+                             :switzerland-fr | :switzerland-it | :taiwan | :turkey |
+                             :united-kingdom | :united-states-en | :united-states-es}]
+               ;; image search arguments:
+               [family-filter {:off | :on}]
+               [:images-size {:any :large :medium :large :icon}]
+               [:images-size-predefined {:any | :400x300 | :640x480 | :800x600 | :1024x768 |
+                                        :1600x1200 ;2MP | :2272x1704 ;4MP | :2816x2112 ;6MP |
+                                        :3264x2448 ;8MP | :3648x2736 ;10MP | :4096x3072 ;12MP |
+                                        :4480x3360 ;15MP :5120x3840 ;20MP :7216x5412 ;40MP
+                                        :9600x7200 ;70MP}]
+               [:images-size-exact-width positive-integer
+                :images-size-exact-height positive-integer]
+               [:images-color {:any | :color-only | :black-white | :transparent |
+                :red | :orange | :yellow | :green | :teal | :blue | :purple |
+                :pink | :gray | :black | :brown}]
+               [:images-type  {:any | :jpg | :png | :gif}]
+               ;; video search arguments:
+               [family-filter {:off | :on}]
+               [videos-filter  {:relevant | :popular | :recent}]
+               [videos-length {:any | :short | :medium | :long}]
+               ;; news search arguments:
+               [news-date  {:any | :day | :week | :month }]
+               ;; To use the advanced settings, users should visit https://startpage.com/do/settings,
+               ;; modify settings then click on "copy settings URL". The copied
+               ;; URL is of the form
+               ;; `https://www.startpage.com/do/mypage.pl?prfe=STRING', where
+               ;; STRING is a 160 character long hexadecimal number, which should
+               ;; be the value of `settings-string'.
+               [settings-string string])
+#+end_src
+
+** Github
+Github is probably the biggest code storage and thus its search is one
+of the best code search engines (especially after Google Code Search
+was shut down). Not much toggles there, except language and type of
+search, but all the advanced search functions and keywords of Github
+are available if you use =(engines:github :object :advanced)= as a search
+engine.
+#+begin_src
+(github [:shortcut string]
+        [:fallback-url quri:uri]
+        [:base-search-url string]
+        [:object {:repositories | :code | :commits | :issues
+                  | :discussions | :packages | :marketplace
+                  | :topics | :wikis | :users | :advanced | string}]
+        [:language string]
+        [:sort-by {:best-match | :stars | :forks |
+                   :recently-updated | :recently-indexed | :recently-commited |
+                   :recently-authored | :recently-joined | :recently-created | :recently-updated |
+                   :most-commented | :most-downloads | :most-followers | :most-repositories}]
+        [:sort-order {:descending | :ascending}]
+        ;; Only works for issue search
+        [:state {:any | :open | :closed}]
+        ;; Only works for package search
+        [:package-type {:any | :npm | :container | :maven | :nuget | :docker | :rubygems}])
+#+end_src
+** Arch packages
+#+begin_src
+(arch [:shortcut string]
+      [:fallback-url quri:uri]
+      [:base-search-url string]
+      [:arch {:any | :x86-64}]
+      [:repository {:all | :community | :community-testing | :core | :extra}]
+      [:maintainer string]
+      [:flagged boolean])
+#+end_src
+*** AUR packages
+This one auto-completes your search, as AUR website has auto-completion that Nyxt can mimick.
+#+begin_src
+(arch [:shortcut string]
+      [:fallback-url quri:uri]
+      [:base-search-url string]
+      [:search-by {:name-and-description | :name | :package-base | :exact-name |
+                   :exact-package-base | :keywords | :maintainer | :co-maintainer |
+                   :maintainer-and-co-maintainer | :submitter}]
+      [:sort-order {:ascending | :descending}]
+      [:outdated boolean]
+      [:sort-by {:name | :votes | :popularity | :voted | :notify | :maintainer | :last-modified}]
+      [:per-page number])
+#+end_src
+** Debian
+#+begin_src
+(debian [:shortcut string]
+        [:fallback-url quri:uri]
+        [:base-search-url string]
+        [:search-on {:names | :all | :source-names}]
+        [:suite {:all | :experimental | :unstable | :testing | :stable | :oldstable}]
+        [:section {:all | :main | :contrib | :non-free}]
+        [:exact boolean])
+#+end_src
+** pkgs
+A search engine for [[https://pkgs.org][pkgs.org]]. Has auto-completion.
+#+begin_src
+(pkgs [:shortcut string]
+      [:fallback-url quri:uri]
+      [:base-search-url string])
+#+end_src
+** PeerTube
+[[https://joinpeertube.org/][PeerTube]] search engine via its global search indexer [[https://sepiasearch.org/][Sepia Search]], which allows one to narrow down a search result by many filters, including by instance.
+
+#+begin_src
+(peertube [:shortcut string]
+          [:fallback-url quri:uri]
+          [:base-search-url string]
+          [:sort-by {:best | :newest | :oldest}]
+          [:is-live boolean]
+          [:published-date {:any | :today | :month | :week | :year}]
+          [:nsfw boolean]
+          [:duration {:any | :short | :medium | :long}]
+          [:category {:all | :music | :films | :vehicles | :art | :sports |
+                      :travels | :gaming | :people | :comedy |
+                      :entertainment | :news-and-politics | :how-to |
+                      :education | :activism | :science-and-technology |
+                      :animals | :kids | :food}]
+          [:licence {:all | :by | :by-sa | :by-nd | :by-nc | :by-nc-sa |
+                     :by-nc | :by-nc-sa | :by-nc-nd | :cc0}]
+          [:language {:all | :english | :francais | :japanese | :euskara |
+                      :catala | :czech | :esperanto | :bulgarian | :deutsch |
+                      :italiano | :nederlands | :espanol | :occitan | :gaelic |
+                      :chinese | :portugues | :svenska | :polski | :suomi |
+                      :russian}]
+          [:host string]
+          [:tags string])
+#+end_src
+** Sourcehut
+Project search index for [[https://sr.ht/][sourcehut]], the hacker's forge.
+
+#+begin_src
+(sourcehut [:shortcut string]
+           [:fallback-url quri:uri]
+           [:base-search-url string]
+           [:sort-by {:recent | :active}])
+#+end_src
+** Libgen
+Search engine for [[https://libgen.li/][Library Genesis]], an aggregator of textual content from public resources. Do note, that due to how this engine supplies attribute filtering for fields, objects, or topics, it's not possible to filter per more than one of these at once unlike on the web interface. Also, it includes a Google mode that enables much more precise queries on the specified attributes through a Google-esque query syntax.
+
+#+begin_src
+(libgen [:shortcut string]
+        [:fallback-url quri:uri]
+        [:base-search-url string]
+        [:results {25 | 50 | 100}])
+        [:covers boolean]
+        [:chapters boolean]
+        [:google-mode boolean]
+        [:file-search {:all | :sorted | :unsorted}]
+        [:field {:title | :author | :series | :year | :publisher | :isbn}]
+        [:object {:files | :editions | :series | :authors | :publishers | :works}]
+        [:topic {:libgen | :comics | :fiction | :articles | :magazines |
+                 :fiction-rus | :standards}]
+        [:tab {:files | :editions | :series | :authors |
+               :publishers | :works}])
+#+end_src
+** Reddit
+[[https://www.reddit.com/][Reddit]] search engine. Its NSFW search filter only works when logged in.
+
+#+begin_src
+(reddit [:shortcut string]
+        [:fallback-url quri:uri]
+        [:base-search-url string]
+        [:sort-by {:relevance | :hot | :top | :new | :comments}]
+        [:only-from-subreddit boolean]
+        [:nsfw boolean]
+        [:date {:all | :year | :month | :week | :day | :hour}]
+        [:type-from {:link | :comments | :communities | :user}])
+#+end_src
+*** Teddit
+A Reddit-derived search engine for [[https://codeberg.org/teddit/teddit][Teddit]], an alternative Reddit front-end focused on privacy.
+** Lemmy
+Search engine for [[https://join-lemmy.org/][Lemmy]], a link aggregator for the Fediverse.
+
+#+begin_src
+(lemmy [:shortcut string]
+       [:fallback-url quri:uri]
+       [:base-search-url string]
+       [:type-from {:all | :comments | :posts | :communities | :users | :url}]
+       [:sort-by {:top-all | :top-year | :top-month | :top-week |
+                  :top-day | :new}]
+       [:listing-type {:all | :local | :subscribed}]
+       [:community-id integer]
+       [:creator-id integer]
+       [:page integer])
+#+end_src
+** Invidious
+Search engine for [[https://invidious.io/][Invidious]], an open source alternative front-end to YouTube.
+
+#+begin_src
+(invidious [:shortcut string]
+           [:fallback-url quri:uri]
+           [:base-search-url string]
+           [:completion-function function]
+           [:upload-date {:none | :hour | :today | :week | :month | :year }]
+           [:result-type {:all | :video | :channel | :playlist | :movie | :show }]
+           [:duration {:none | :short | :long | :medium}]
+           [:features {:none | :live | :4k | :hd | :subtitles | :cc | :vr-180 |
+                       :3d | :hdr | :location | :purchased}]
+           [:sort-by {:relevance | :rating | :date | :views}])
+#+end_src
+*** Invidious completion helper
+    =make-invidious-completion= returns a search-ready completion function
+    (it's already included if you use =invidious=). Syntax is:
+
+#+begin_src
+(make-invidious-completion [:instance string]
+                           [:request-args list])
+#+end_src
+** Discourse
+Search engine for [[https://www.discourse.org/][Discourse]] instances, where you can use its advanced search syntax for most of the search filters.
+
+#+begin_src
+(discourse [:shortcut string]
+           [:fallback-url quri:uri]
+           [:base-search-url string]
+           [:search-type {:default | :categories | :users}])
+#+end_src
+** Meetup
+Search engine for [[https://www.meetup.com/][Meetup]], a social platform to engage in online communities and events. Its =:suggested= search filter is only available when you're logged in and the =:location= filter takes the form of =country_code--city_name=, such as =gb--London=.
+
+#+begin_src
+(meetup [:shortcut string]
+        [:fallback-url quri:uri]
+        [:base-search-url string]
+        [:distance {:any | integer}]
+        [:sort-by {:default | :relevance | :date}]
+        [:date {:any | :soon | :today | :tomorrow | :this-week |
+                :this-weekend | :next-week}]
+        [:start-date string]
+        [:end-date string]
+        [:event-type {:default | :in-person | :online | :indoor | :outdoor}]
+        [:category {:default | :new-groups | :art-culture | :career-business |
+                    :community-environment | :dancing | :games | :health-wellbeing |
+                    :hobbies-passions | :identity-language | :movement-politics |
+                    :music | :parents-family | :pets-animal | :religion-spirituality |
+                    :science-education | :social-activities | :sports-fitness |
+                    :support-coaching | :technology | :travel-outdoor | :writing}]
+        [:source {:events | :groups}]
+        [:suggested boolean]
+        [:location string])
+#+end_src
+** Gitea
+[[https://gitea.io/en-us/][Gitea]] search engine, a self-hosted Git service.
+
+#+begin_src
+(gitea [:shortcut string]
+       [:fallback-url quri:uri]
+       [:base-search-url string]
+       [:unfiltered boolean]
+       [:sort-by {:recently-updated | :newest | :oldest | :ascending | :descending |
+                  :least-updated | :most-stars | :fewest-stars | :most-forks |
+                  :fewest-forks}])
+#+end_src
+*** Gitea users (=gitea-users=)
+A derived search engine for user search in a given Gitea instance.
+*** Gitea organizations (=gitea-organizations=)
+A derived search engine for organization search in a given Gitea instance.
+** Hacker News
+#+begin_src
+(hacker-news [:shortcut string]
+             [:fallback-url quri:uri]
+             [:base-search-url string]
+             [:date-range {:all | :past-24-hours | :past-week | :past-month |
+                           :past-year | :custom}]
+             [:date-start string]
+             [:date-end string]
+             [:sort-by {:popularity | :date}]
+             [:search-type {:story | :all | :comments}])
+#+end_src
+** Lobsters
+Search engine for Lobsters, a computing-focused link aggregator. Its query syntax can be found in [[https://github.com/lobsters/lobsters/blob/master/app/controllers/search_controller.rb][this source file]].
+#+begin_src
+(lobsters [:shortcut string]
+          [:fallback-url quri:uri]
+          [:base-search-url string]
+          [:search-type {:default | :comments}]
+          [:order-by {:default | :relevance | :points}])
+#+end_src
+* Changelog
+** 0.0.1
+First version, experimental.
+** 0.9.0
+Stable version targeting Nyxt 2-pre-release 6.
+- =define-search-engine= is full-featured.
+** 1.0.0
+Stable release targeting Nyxt 2.0.
+** 1.1.0
+- Remove =search-engines-mode= as close-to-meaningless and unstable.
+- =base-search-url= argument to =define-search-engine=, mainly to support newly added SearX (thanks @edgar-vincent!).
+- Startpage (thanks to @edgar-vincent again).
+- Yahoo!
+- HTML-only DuckDuckGo.
+* Future Plans
+- Add more engines (see comments in search-engines.lisp).
